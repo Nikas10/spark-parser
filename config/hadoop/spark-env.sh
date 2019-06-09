@@ -1,0 +1,1 @@
+export HADOOP_CONF_DIR="/usr/hadoop-3.0.0/etc/hadoop"
