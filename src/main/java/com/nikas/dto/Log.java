@@ -16,7 +16,7 @@ public class Log {
 
     private String method;
 
-    private String code;
+    private Integer code;
 
     private String date;
 

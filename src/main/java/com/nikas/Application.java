@@ -4,10 +4,10 @@ import static org.apache.spark.sql.functions.*;
 
 import com.nikas.dto.Log;
 import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import scala.Tuple2;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -46,12 +46,12 @@ public class Application {
 
         JavaRDD<Log> rdd = sparkSession.read().textFile(HDFS + "/logs/log")
             .javaRDD()
-            .map(e -> parseLogLine(e))
+            .map(Application::parseLogLine)
             .filter(Objects::nonNull);
 
         Dataset<Row> dataSet = sparkSession.createDataFrame(rdd, Log.class);
 
-        parseTaskOne(dataSet);
+        parseTaskOne(rdd);
         parseTaskTwo(dataSet);
         parseTaskThree(dataSet);
     }
@@ -60,19 +60,17 @@ public class Application {
         try {
             Matcher matcher = LOG_PATTERN.matcher(line);
             LocalDate logDateTime = LocalDate.parse(matcher.group(4), LOG_FORMATTER);
-            return new Log(matcher.group(5), matcher.group(6), matcher.group(8), logDateTime.format(DATE_FORMATTER));
+            return new Log(matcher.group(5), matcher.group(6), Integer.valueOf(matcher.group(8)),
+                    logDateTime.format(DATE_FORMATTER));
         } catch (Exception e) {
             return null;
         }
     }
 
-    private static void parseTaskOne(Dataset<Row> dataSet) {
-        dataSet.filter(col(COLUMN_CODE).between(500, 599))
-            .groupBy(COLUMN_REQUEST)
-            .count()
-            .select(COLUMN_REQUEST, COLUMN_COUNT)
-            .coalesce(1)
-            .toJavaRDD()
+    private static void parseTaskOne(JavaRDD<Log> rdd) {
+        rdd.filter(e -> (e.getCode() >= 300))
+            .mapToPair(e -> new Tuple2<>(e.getRequest(), 1))
+            .reduceByKey(Integer::sum)
             .saveAsTextFile(HDFS + TASK_1);
     }
 
